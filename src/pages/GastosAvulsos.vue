@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { Pencil, Plus, Receipt, Search, Trash2 } from 'lucide-vue-next';
 import PeriodoFilter from '@/components/PeriodoFilter.vue';
 import StatCard from '@/components/StatCard.vue';
@@ -13,6 +13,8 @@ import Campo from '@/components/Campo.vue';
 import CategoriaTag from '@/components/CategoriaTag.vue';
 import Selo from '@/components/Selo.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import Pagination from '@/components/Pagination.vue';
+import { usePaginacao } from '@/lib/usePaginacao';
 import { CORES_TIPO, formatarData, formatarMoeda } from '@/utils/format';
 import { usePeriodo } from '@/lib/usePeriodo';
 import { estado, novoId, paraNumero, prepararAvulso } from '@/lib/store';
@@ -35,6 +37,10 @@ const filtrados = computed(() => {
         .filter((g) => (!q || g.descricao.toLowerCase().includes(q)) && (!categoriaFiltro.value || g.categoria_id === Number(categoriaFiltro.value)))
         .sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : b.id - a.id));
 });
+const pg = usePaginacao(filtrados, 10);
+// Buscar, trocar a categoria ou o período volta à primeira página.
+watch([busca, categoriaFiltro, () => periodo.value.inicio, () => periodo.value.fim], () => pg.reiniciar());
+
 const totalPeriodo = computed(() => Math.round(doPeriodo.value.reduce((s, g) => s + g.valor, 0) * 100) / 100);
 const totalFiltrado = computed(() => Math.round(filtrados.value.reduce((s, g) => s + g.valor, 0) * 100) / 100);
 const limite = computed(() => (periodo.value.ciclo ? Number(estado.config.limite_avulsos) || 0 : 0));
@@ -153,7 +159,7 @@ function excluir() {
                     <tr class="text-left"><th>Data</th><th>Descrição</th><th>Categoria</th><th>Pagamento</th><th class="text-right">Valor</th><th /></tr>
                 </thead>
                 <tbody>
-                    <tr v-for="g in filtrados" :key="g.id">
+                    <tr v-for="g in pg.itens.value" :key="g.id">
                         <td class="whitespace-nowrap">{{ formatarData(g.data) }}</td>
                         <td class="font-medium">{{ g.descricao }}</td>
                         <td><CategoriaTag :id="g.categoria_id" /></td>
@@ -167,6 +173,7 @@ function excluir() {
                 </tbody>
             </table>
         </div>
+        <Pagination v-model:por-pagina="pg.porPagina.value" :pagina="pg.pagina.value" :ultima="pg.ultima.value" :total="pg.total.value" @ir="pg.irPara" />
     </section>
 
     <Modal :aberto="modal" :titulo="editando ? 'Editar gasto' : 'Novo gasto avulso'" @fechar="modal = false">

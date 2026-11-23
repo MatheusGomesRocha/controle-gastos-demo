@@ -11,6 +11,8 @@ import Campo from '@/components/Campo.vue';
 import CategoriaTag from '@/components/CategoriaTag.vue';
 import Selo from '@/components/Selo.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import Pagination from '@/components/Pagination.vue';
+import { usePaginacao } from '@/lib/usePaginacao';
 import { CORES_TIPO, formatarData, formatarMoeda } from '@/utils/format';
 import { usePeriodo } from '@/lib/usePeriodo';
 import { estado, novoId, paraNumero } from '@/lib/store';
@@ -27,6 +29,7 @@ const porCat = computed(() => porCategoria(eventos.value));
 const peso = computed(() => (totalGeral.value > 0 ? (totalPeriodo.value / totalGeral.value) * 100 : 0));
 
 const linhas = computed(() => [...estado.fixos].sort((a, b) => a.descricao.localeCompare(b.descricao)));
+const pg = usePaginacao(linhas, 10);
 const situacao = (f) => (!f.ativo ? ['cinza', 'Inativo'] : f.data_fim && f.data_fim < hoje() ? ['cinza', 'Encerrado'] : ['verde', 'Ativo']);
 
 // ---------- Formulário ----------
@@ -103,7 +106,7 @@ function excluir() {
                     <tr class="text-left"><th>Descrição</th><th>Categoria</th><th class="text-right">Valor</th><th>Cobrança</th><th>Vigência</th><th>Situação</th><th /></tr>
                 </thead>
                 <tbody>
-                    <tr v-for="f in linhas" :key="f.id">
+                    <tr v-for="f in pg.itens.value" :key="f.id">
                         <td class="font-medium">{{ f.descricao }}</td>
                         <td><CategoriaTag :id="f.categoria_id" /></td>
                         <td class="text-right tabular-nums">{{ formatarMoeda(f.valor) }}</td>
@@ -118,6 +121,7 @@ function excluir() {
                 </tbody>
             </table>
         </div>
+        <Pagination v-model:por-pagina="pg.porPagina.value" :pagina="pg.pagina.value" :ultima="pg.ultima.value" :total="pg.total.value" @ir="pg.irPara" />
     </section>
 
     <Modal :aberto="modal" :titulo="editando ? 'Editar gasto fixo' : 'Novo gasto fixo'" @fechar="modal = false">

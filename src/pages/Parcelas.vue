@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { CreditCard, Hourglass, Pencil, Plus, Trash2, CheckCircle2 } from 'lucide-vue-next';
 import PeriodoFilter from '@/components/PeriodoFilter.vue';
 import StatCard from '@/components/StatCard.vue';
@@ -12,6 +12,8 @@ import CategoriaTag from '@/components/CategoriaTag.vue';
 import ProgressBar from '@/components/ProgressBar.vue';
 import Selo from '@/components/Selo.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import Pagination from '@/components/Pagination.vue';
+import { usePaginacao } from '@/lib/usePaginacao';
 import { CORES_TIPO, formatarData, formatarMoeda } from '@/utils/format';
 import { usePeriodo } from '@/lib/usePeriodo';
 import { ancorarParcela, ciclos, estado, novoId, numeroNoCiclo, pagasAteCiclo, paraNumero, proximoVencimentoParcela, situacaoNoCiclo } from '@/lib/store';
@@ -38,6 +40,10 @@ const linhas = computed(() =>
         .filter((l) => (situacao.value === 'todas' ? true : situacao.value === 'ativas' ? l.sit === 'ativa' : l.sit === 'vencida'))
         .sort((a, b) => a.descricao.localeCompare(b.descricao)),
 );
+
+const pg = usePaginacao(linhas, 10);
+// Trocar o filtro (todas/ativas/vencidas) ou o ciclo volta à primeira página.
+watch([situacao, ref_], () => pg.reiniciar());
 
 const totalCiclo = computed(() =>
     estado.parcelas.reduce((s, p) => s + (numeroNoCiclo(p, ref_.value) !== null ? Number(p.valor_parcela) : 0), 0),
@@ -139,7 +145,7 @@ function excluir() {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="l in linhas" :key="l.id">
+                    <tr v-for="l in pg.itens.value" :key="l.id">
                         <td class="font-medium">{{ l.descricao }}</td>
                         <td><CategoriaTag :id="l.categoria_id" /></td>
                         <td>
@@ -165,6 +171,7 @@ function excluir() {
                 </tbody>
             </table>
         </div>
+        <Pagination v-model:por-pagina="pg.porPagina.value" :pagina="pg.pagina.value" :ultima="pg.ultima.value" :total="pg.total.value" @ir="pg.irPara" />
     </section>
 
     <Modal :aberto="modal" :titulo="editando ? 'Editar parcela' : 'Nova compra parcelada'" @fechar="modal = false">
