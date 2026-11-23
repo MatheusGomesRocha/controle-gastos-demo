@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { ArrowDownRight, ArrowUpRight, CalendarClock, CreditCard, Hourglass, Minus, Receipt, Repeat, Wallet } from 'lucide-vue-next';
 import PeriodoFilter from '@/components/PeriodoFilter.vue';
@@ -89,6 +89,13 @@ const avulsosDia = computed(() => ({
     labels: g.value.avulsos_por_dia.labels,
     datasets: [{ label: 'Gastos avulsos', data: g.value.avulsos_por_dia.avulso, color: CORES_TIPO.avulso }],
 }));
+const aba = ref('geral');
+const ABAS = [{ id: 'geral', nome: 'Visão geral' }, { id: 'parcelas', nome: 'Parcelas' }, { id: 'fixos', nome: 'Gastos fixos' }, { id: 'avulsos', nome: 'Gastos avulsos' }];
+const partes = computed(() => [
+    { nome: 'Parcelas', cor: CORES_TIPO.parcela, valor: t.value.parcelas },
+    { nome: 'Fixos', cor: CORES_TIPO.fixo, valor: t.value.fixos },
+    { nome: 'Avulsos', cor: CORES_TIPO.avulso, valor: t.value.avulsos },
+].map((x) => ({ ...x, pct: t.value.total ? (x.valor / t.value.total) * 100 : 0 })));
 const subiu = computed(() => comp.value.diferenca > 0);
 const caiu = computed(() => comp.value.diferenca < 0);
 const comparativo = computed(() => ({
@@ -105,15 +112,43 @@ const comparativo = computed(() => ({
 
     <PeriodoFilter :periodo="filtro" />
 
-    <div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard titulo="Total do período" :valor="t.total" :icone="Wallet" cor="#4f46e5" dica="Parcelas + gastos fixos + gastos avulsos" />
-        <StatCard titulo="Parcelas" :valor="t.parcelas" :icone="CreditCard" :cor="CORES_TIPO.parcela" dica="Compras parceladas que vencem no período" />
-        <StatCard titulo="Gastos fixos" :valor="t.fixos" :icone="Repeat" :cor="CORES_TIPO.fixo" dica="Contas que se repetem todo ciclo" />
-        <StatCard titulo="Gastos avulsos" :valor="t.avulsos" :icone="Receipt" :cor="CORES_TIPO.avulso" dica="Gastos pontuais do dia a dia">
+    <section class="relative mb-4 overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-600 to-violet-700 p-6 text-white shadow-lg shadow-indigo-200/60 sm:p-8">
+        <div class="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl"></div>
+        <div class="relative grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-end">
+            <div>
+                <p class="flex items-center gap-2 text-sm font-medium text-indigo-100"><Wallet class="h-4 w-4" /> Total gasto no período</p>
+                <p class="mt-2 text-4xl font-semibold tabular-nums tracking-tight sm:text-5xl">{{ formatarMoeda(t.total) }}</p>
+                <p class="mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium" :class="subiu ? 'bg-red-400/25 text-red-50' : caiu ? 'bg-emerald-400/25 text-emerald-50' : 'bg-white/15 text-indigo-50'">
+                    <ArrowUpRight v-if="subiu" class="h-4 w-4" />
+                    <ArrowDownRight v-else-if="caiu" class="h-4 w-4" />
+                    <Minus v-else class="h-4 w-4" />
+                    <template v-if="comp.percentual === null">Sem período anterior para comparar</template>
+                    <template v-else>{{ subiu ? '+' : '' }}{{ formatarMoeda(comp.diferenca) }} ({{ subiu ? '+' : '' }}{{ formatarPercentual(comp.percentual) }}) vs {{ comp.rotulo_anterior }}</template>
+                </p>
+            </div>
+            <div>
+                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-indigo-200">Como esse total se divide</p>
+                <div class="flex h-3 overflow-hidden rounded-full bg-white/15">
+                    <div v-for="x in partes" :key="x.nome" :style="{ width: x.pct + '%', backgroundColor: x.cor }" class="transition-all duration-500"></div>
+                </div>
+                <ul class="mt-3 grid grid-cols-3 gap-2 text-sm">
+                    <li v-for="x in partes" :key="x.nome">
+                        <span class="flex items-center gap-1.5 text-indigo-100"><span class="h-2 w-2 rounded-full" :style="{ backgroundColor: x.cor }"></span>{{ x.nome }}</span>
+                        <span class="font-semibold tabular-nums">{{ formatarMoeda(x.valor) }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <StatCard class="lg:col-span-2" titulo="Parcelas" :valor="t.parcelas" :icone="CreditCard" :cor="CORES_TIPO.parcela" dica="Compras parceladas que vencem no período" />
+        <StatCard class="lg:col-span-2" titulo="Gastos fixos" :valor="t.fixos" :icone="Repeat" :cor="CORES_TIPO.fixo" dica="Contas que se repetem todo ciclo" />
+        <StatCard class="sm:col-span-2 lg:col-span-2" titulo="Gastos avulsos" :valor="t.avulsos" :icone="Receipt" :cor="CORES_TIPO.avulso" dica="Gastos pontuais do dia a dia">
             <LimiteBarra v-if="dados.limite" compacto :gasto="t.avulsos" :limite="dados.limite" />
         </StatCard>
-        <StatCard titulo="Falta pagar em parcelas" :valor="dados.saldo.total_restante" :icone="Hourglass" cor="#ef4444" dica="Saldo das compras parceladas, ao fim do período" />
-        <StatCard titulo="Próximo vencimento" :texto="formatarData(dados.proximo.data)" :icone="CalendarClock" cor="#0d9488" :dica="`Início do ciclo ${dados.proximo.ciclo}. Já previsto: ${formatarMoeda(dados.proximo.valor)}`" />
+        <StatCard class="lg:col-span-3" titulo="Falta pagar em parcelas" :valor="dados.saldo.total_restante" :icone="Hourglass" cor="#ef4444" dica="Saldo das compras parceladas, ao fim do período" />
+        <StatCard class="lg:col-span-3" titulo="Próximo vencimento" :texto="formatarData(dados.proximo.data)" :icone="CalendarClock" cor="#0d9488" :dica="`Início do ciclo ${dados.proximo.ciclo}. Já previsto: ${formatarMoeda(dados.proximo.valor)}`" />
     </div>
 
     <div v-if="semGastos" class="mb-6 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/60 p-6 text-center">
@@ -126,7 +161,11 @@ const comparativo = computed(() => ({
         </div>
     </div>
 
-    <div class="grid gap-6 lg:grid-cols-2">
+    <nav class="mb-5 inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm" aria-label="Gráficos">
+        <button v-for="a in ABAS" :key="a.id" type="button" class="rounded-xl px-4 py-2 text-sm font-medium transition" :class="aba === a.id ? 'bg-indigo-600 text-white shadow' : 'text-slate-600 hover:bg-slate-100'" @click="aba = a.id">{{ a.nome }}</button>
+    </nav>
+
+    <div v-if="aba === 'geral'" class="grid gap-6 lg:grid-cols-2">
         <ChartCard class="lg:col-span-2" titulo="Gasto por dia" descricao="Quanto saiu em cada dia, separado por tipo. Parcelas caem no dia do vencimento e fixos no dia de cobrança." :vazio="semGastos">
             <BarChart :labels="porDiaDados.labels" :datasets="porDiaDados.datasets" empilhado />
         </ChartCard>
@@ -142,27 +181,8 @@ const comparativo = computed(() => ({
             <BarChart :labels="evolucaoDados.labels" :datasets="evolucaoDados.datasets" empilhado />
         </ChartCard>
 
-        <ChartCard titulo="Comparação com o período anterior" descricao="Você gastou mais ou menos que no período anterior?" :vazio="comp.total_anterior === 0 && semGastos">
-            <div class="mb-4 flex items-center gap-3">
-                <span class="flex h-11 w-11 items-center justify-center rounded-xl" :class="subiu ? 'bg-red-50 text-red-600' : caiu ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'">
-                    <ArrowUpRight v-if="subiu" class="h-6 w-6" />
-                    <ArrowDownRight v-else-if="caiu" class="h-6 w-6" />
-                    <Minus v-else class="h-6 w-6" />
-                </span>
-                <div>
-                    <p class="text-xl font-semibold tabular-nums" :class="subiu ? 'text-red-600' : caiu ? 'text-emerald-600' : 'text-slate-700'">
-                        {{ subiu ? '+' : '' }}{{ formatarMoeda(comp.diferenca) }}
-                        <span v-if="comp.percentual !== null" class="text-base">({{ subiu ? '+' : '' }}{{ formatarPercentual(comp.percentual) }})</span>
-                    </p>
-                    <p class="text-sm text-slate-500">
-                        <template v-if="comp.percentual === null">Sem gastos no período anterior para comparar.</template>
-                        <template v-else>{{ subiu ? 'Gastou mais' : caiu ? 'Gastou menos' : 'Igual' }} que em {{ comp.rotulo_anterior }}.</template>
-                    </p>
-                </div>
-            </div>
-            <BarChart :labels="comparativo.labels" :datasets="comparativo.datasets" :legenda="false" :altura="200" />
-        </ChartCard>
-
+    </div>
+    <div v-else-if="aba === 'parcelas'" class="grid gap-6 lg:grid-cols-2">
         <ChartCard titulo="Parcelas: valor por ciclo" descricao="Quanto vence em parcelas em cada ciclo. Os tons claros são previsões." :vazio="g.parcelas_por_ciclo.valores.every((v) => v === 0)">
             <BarChart :labels="parcelasCiclo.labels" :datasets="parcelasCiclo.datasets" :legenda="false" />
         </ChartCard>
@@ -170,6 +190,8 @@ const comparativo = computed(() => ({
             <BarChart :labels="saldoCompras.labels" :datasets="saldoCompras.datasets" horizontal :legenda="false" :altura="Math.max(200, g.saldo_parcelas.length * 44)" />
         </ChartCard>
 
+    </div>
+    <div v-else-if="aba === 'fixos'" class="grid gap-6 lg:grid-cols-2">
         <ChartCard titulo="Gastos fixos por categoria" descricao="Em quais categorias estão as suas contas fixas." :vazio="!g.fixos_por_categoria.length">
             <DoughnutChart :itens="g.fixos_por_categoria" />
         </ChartCard>
@@ -177,6 +199,8 @@ const comparativo = computed(() => ({
             <DoughnutChart :itens="pesoFixos" />
         </ChartCard>
 
+    </div>
+    <div v-else class="grid gap-6 lg:grid-cols-2">
         <ChartCard titulo="Gastos avulsos por dia" descricao="Os gastos pontuais, dia a dia." :vazio="t.avulsos === 0">
             <BarChart :labels="avulsosDia.labels" :datasets="avulsosDia.datasets" :legenda="false" />
         </ChartCard>
