@@ -38,7 +38,14 @@ export function periodoDaConsulta(query) {
         return periodoLivre(inicio, fim);
     }
     const c = ciclo ? ciclos.value.cicloDaChave(String(ciclo)) : null;
-    return periodoDoCiclo(c || ciclos.value.cicloAtual());
+    if (c) return periodoDoCiclo(c);
+
+    // Sem filtro na URL: abre no ciclo atual. Na demonstração, se o ciclo acabou de começar e quase não tem
+    // gastos avulsos, abre no anterior para os gráficos não aparecerem vazios (o botão "Ciclo atual" leva ao atual).
+    const atual = ciclos.value.cicloAtual();
+    const qtd = (cc) => estado.avulsos.filter((g) => entre(g.data, cc.inicio, cc.fim)).length;
+    const anterior = ciclos.value.anterior(atual);
+    return periodoDoCiclo(qtd(atual) < 8 && qtd(anterior) > qtd(atual) ? anterior : atual);
 }
 
 /** Período imediatamente anterior: ciclo anterior, ou intervalo livre de mesmo tamanho. */

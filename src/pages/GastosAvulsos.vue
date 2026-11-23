@@ -17,6 +17,7 @@ import { CORES_TIPO, formatarData, formatarMoeda } from '@/utils/format';
 import { usePeriodo } from '@/lib/usePeriodo';
 import { estado, novoId, paraNumero, prepararAvulso } from '@/lib/store';
 import { eventosDoPeriodo, porCategoria, porDia } from '@/lib/relatorio';
+import { agrupar } from '@/lib/agrupador';
 import { hoje } from '@/lib/datas';
 import { avisar } from '@/lib/aviso';
 
@@ -44,6 +45,9 @@ const graficoDia = computed(() => {
     return { labels: d.labels, datasets: [{ label: 'Gastos avulsos', data: d.avulso, color: CORES_TIPO.avulso }] };
 });
 const porCat = computed(() => porCategoria(eventos.value));
+// Repetição de contas (ex.: Pizza, Café) no período todo, sem os filtros da tabela.
+const repetidas = computed(() => agrupar(eventos.value));
+const maiorRepeticao = computed(() => Math.max(1, ...repetidas.value.map((i) => i.quantidade)));
 
 // ---------- Formulário ----------
 const modal = ref(false);
@@ -52,12 +56,6 @@ const erros = reactive({});
 // Atenção (igual ao original): o campo da data se chama data_gasto, nunca "data".
 const vazio = () => ({ descricao: '', categoria_id: estado.categorias[0]?.id ?? 1, valor: '', data_gasto: hoje(), forma_pagamento: 'debito', observacao: '' });
 const form = reactive(vazio());
-
-const previa = computed(() => {
-    const v = paraNumero(form.valor);
-    if (!(v > 0)) return null;
-    return prepararAvulso({ valor: form.valor, forma_pagamento: form.forma_pagamento });
-});
 
 function abrir(g = null) {
     editando.value = g;
@@ -120,6 +118,20 @@ function excluir() {
         </ChartCard>
     </div>
 
+    <ChartCard class="mb-6" titulo="Contas que mais se repetem" descricao="Agrupa pela palavra principal da descrição (ex.: “Pix Pizzaria” e “Pizza com amigos” viram Pizza). Cada gasto conta uma vez só, na primeira palavra. Aparecem só as que se repetem 2 vezes ou mais." :vazio="!repetidas.length">
+        <ul class="space-y-3">
+            <li v-for="item in repetidas" :key="item.nome">
+                <div class="mb-1 flex items-baseline justify-between gap-3 text-sm">
+                    <span class="font-medium text-slate-700">{{ item.nome }}</span>
+                    <span class="text-slate-500"><strong class="text-slate-800">{{ item.quantidade }}x</strong> · {{ formatarMoeda(item.total) }}</span>
+                </div>
+                <div class="h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div class="h-full rounded-full" :style="{ width: (item.quantidade / maiorRepeticao) * 100 + '%', backgroundColor: CORES_TIPO.avulso }" />
+                </div>
+            </li>
+        </ul>
+    </ChartCard>
+
     <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div class="flex flex-wrap gap-3 border-b border-slate-100 p-4">
             <div class="relative min-w-[200px] flex-1">
@@ -145,7 +157,7 @@ function excluir() {
                         <td class="whitespace-nowrap">{{ formatarData(g.data) }}</td>
                         <td class="font-medium">{{ g.descricao }}</td>
                         <td><CategoriaTag :id="g.categoria_id" /></td>
-                        <td><Selo :tom="g.forma_pagamento === 'pix' ? 'ambar' : 'cinza'">{{ FORMAS[g.forma_pagamento] }}<template v-if="g.juros_percentual > 0"> +{{ g.juros_percentual }}%</template></Selo></td>
+                        <td><Selo tom="cinza">{{ FORMAS[g.forma_pagamento] }}</Selo></td>
                         <td class="text-right tabular-nums">{{ formatarMoeda(g.valor) }}</td>
                         <td class="whitespace-nowrap text-right">
                             <button class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Editar" @click="abrir(g)"><Pencil class="h-4 w-4" /></button>
@@ -166,9 +178,6 @@ function excluir() {
                 <Campo label="Categoria"><select v-model="form.categoria_id" class="input"><option v-for="c in estado.categorias" :key="c.id" :value="c.id">{{ c.nome }}</option></select></Campo>
                 <Campo label="Forma de pagamento"><select v-model="form.forma_pagamento" class="input"><option v-for="(nome, chave) in FORMAS" :key="chave" :value="chave">{{ nome }}</option></select></Campo>
             </div>
-            <p v-if="form.forma_pagamento === 'pix' && previa" class="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-                Pix com acréscimo de {{ estado.config.juros_pix }}%: o valor lançado será <strong>{{ formatarMoeda(previa.valor) }}</strong>.
-            </p>
             <Campo label="Observação (opcional)"><input v-model="form.observacao" class="input" /></Campo>
             <div class="flex justify-end gap-3 pt-2">
                 <button type="button" class="btn-secundario" @click="modal = false">Cancelar</button>

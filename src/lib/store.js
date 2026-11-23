@@ -5,10 +5,10 @@ import { criarCiclos } from './ciclo';
 import { hoje, somarDias } from './datas';
 import { gerarDadosExemplo, categoriasPadrao } from './seed';
 
-const CHAVE = 'controle-gastos-demo:v1';
+const CHAVE = 'controle-gastos-demo:v2';
 
 const vazio = () => ({
-    config: { dia_vencimento: 23, juros_pix: 5, limite_avulsos: 0 },
+    config: { dia_vencimento: 23, limite_avulsos: 0 },
     categorias: categoriasPadrao(),
     parcelas: [],
     fixos: [],
@@ -69,19 +69,10 @@ export const categoriaEmUso = (id) =>
     [...estado.parcelas, ...estado.fixos, ...estado.avulsos].some((g) => g.categoria_id === id);
 
 // ---------- Gastos avulsos ----------
-/**
- * Valor final conforme a forma de pagamento. Pix recebe um acréscimo (padrão 5%, configurável).
- * O percentual usado fica gravado no próprio gasto: mudar a configuração depois não reescreve o passado.
- */
+/** Converte o valor digitado em número e grava o valor final do gasto. */
 export function prepararAvulso(dados) {
-    const digitado = Math.round(paraNumero(dados.valor) * 100) / 100;
-    const juros = dados.forma_pagamento === 'pix' ? Number(estado.config.juros_pix) || 0 : 0;
-    return {
-        ...dados,
-        valor_original: digitado,
-        juros_percentual: juros,
-        valor: Math.round(digitado * (1 + juros / 100) * 100) / 100,
-    };
+    const valor = Math.round(paraNumero(dados.valor) * 100) / 100;
+    return { ...dados, valor };
 }
 
 /** Aceita "1.234,56" (com vírgula, os pontos são milhares) e "12.5" (sem vírgula, ponto é decimal). */

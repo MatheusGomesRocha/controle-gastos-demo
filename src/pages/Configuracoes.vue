@@ -12,7 +12,6 @@ import { avisar } from '@/lib/aviso';
 // ---------- Ciclo e regras ----------
 const cfg = reactive({
     dia_vencimento: estado.config.dia_vencimento,
-    juros_pix: String(estado.config.juros_pix).replace('.', ','),
     limite_avulsos: estado.config.limite_avulsos ? String(estado.config.limite_avulsos).replace('.', ',') : '',
 });
 const erroCfg = reactive({});
@@ -27,13 +26,11 @@ const previa = computed(() => {
 function salvarConfig() {
     Object.keys(erroCfg).forEach((k) => delete erroCfg[k]);
     const dia = Number(cfg.dia_vencimento);
-    const juros = paraNumero(cfg.juros_pix);
     const limite = cfg.limite_avulsos === '' ? 0 : paraNumero(cfg.limite_avulsos);
     if (!Number.isInteger(dia) || dia < 1 || dia > 31) erroCfg.dia_vencimento = 'Use um dia de 1 a 31.';
-    if (juros < 0 || juros > 100) erroCfg.juros_pix = 'Use um percentual entre 0 e 100.';
     if (limite < 0) erroCfg.limite_avulsos = 'Não pode ser negativo.';
     if (Object.keys(erroCfg).length) return;
-    Object.assign(estado.config, { dia_vencimento: dia, juros_pix: juros, limite_avulsos: limite });
+    Object.assign(estado.config, { dia_vencimento: dia, limite_avulsos: limite });
     avisar('Configurações salvas.');
 }
 
@@ -74,7 +71,7 @@ const confirmando = ref(null);
 function executar() {
     if (confirmando.value === 'exemplo') restaurarExemplo();
     else limparTudo();
-    Object.assign(cfg, { dia_vencimento: estado.config.dia_vencimento, juros_pix: String(estado.config.juros_pix), limite_avulsos: estado.config.limite_avulsos ? String(estado.config.limite_avulsos) : '' });
+    Object.assign(cfg, { dia_vencimento: estado.config.dia_vencimento, limite_avulsos: estado.config.limite_avulsos ? String(estado.config.limite_avulsos) : '' });
     confirmando.value = null;
     avisar('Pronto!');
 }
@@ -90,14 +87,13 @@ function executar() {
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 class="text-base font-semibold">Ciclo financeiro e regras</h2>
             <p class="mt-0.5 text-sm text-slate-500">Seu mês financeiro não precisa começar no dia 1: ele vai do dia de vencimento até o dia anterior do mês seguinte.</p>
-            <form class="mt-5 grid gap-4 sm:grid-cols-3" @submit.prevent="salvarConfig">
+            <form class="mt-5 grid gap-4 sm:grid-cols-2" @submit.prevent="salvarConfig">
                 <Campo label="Dia de vencimento (1–31)" :erro="erroCfg.dia_vencimento"><input v-model="cfg.dia_vencimento" type="number" min="1" max="31" class="input" /></Campo>
-                <Campo label="Acréscimo do Pix (%)" :erro="erroCfg.juros_pix" dica="Somado aos gastos avulsos pagos no Pix."><input v-model="cfg.juros_pix" inputmode="decimal" class="input" /></Campo>
                 <Campo label="Limite de avulsos por ciclo (R$)" :erro="erroCfg.limite_avulsos" dica="Vazio = sem limite."><input v-model="cfg.limite_avulsos" inputmode="decimal" class="input" /></Campo>
-                <div class="sm:col-span-3">
+                <div class="sm:col-span-2">
                     <p v-if="previa" class="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-800">Seu ciclo atual vai de <strong>{{ formatarData(previa.inicio) }}</strong> a <strong>{{ formatarData(previa.fim) }}</strong> ({{ previa.rotulo }}).</p>
                 </div>
-                <div class="sm:col-span-3"><button type="submit" class="btn-primario">Salvar configurações</button></div>
+                <div class="sm:col-span-2"><button type="submit" class="btn-primario">Salvar configurações</button></div>
             </form>
         </section>
 

@@ -13,7 +13,7 @@ export const categoriasPadrao = () => [
 ];
 
 export function gerarDadosExemplo() {
-    const config = { dia_vencimento: 23, juros_pix: 5, limite_avulsos: 1800 };
+    const config = { dia_vencimento: 23, limite_avulsos: 3000 };
     const c = criarCiclos(config.dia_vencimento);
     const atual = c.cicloAtual();
     const hojeISO = hoje();
@@ -67,53 +67,55 @@ export function gerarDadosExemplo() {
         ativo: true,
     }));
 
-    // Gastos avulsos: [dias atrás, descrição, categoria, valor digitado, forma de pagamento]
-    const avulsosBase = [
-        [0, 'Almoço no restaurante', 2, 38.9, 'credito'],
-        [1, 'Mercado da semana', 2, 214.35, 'debito'],
-        [2, 'Combustível', 3, 180.0, 'credito'],
-        [3, 'Cinema', 4, 56.0, 'pix'],
-        [4, 'Farmácia', 5, 47.8, 'debito'],
-        [5, 'Padaria', 2, 18.5, 'dinheiro'],
-        [7, 'Aplicativo de transporte', 3, 24.9, 'credito'],
-        [8, 'Pizza com amigos', 2, 92.0, 'pix'],
-        [10, 'Presente de aniversário', 7, 120.0, 'credito'],
-        [12, 'Mercado da semana', 2, 189.7, 'debito'],
-        [14, 'Combustível', 3, 175.0, 'credito'],
-        [15, 'Show', 4, 160.0, 'pix'],
-        [17, 'Lanche', 2, 29.9, 'credito'],
-        [19, 'Consulta de rotina', 5, 150.0, 'pix'],
-        [21, 'Mercado da semana', 2, 203.1, 'debito'],
-        [23, 'Estacionamento', 3, 22.0, 'dinheiro'],
-        [26, 'Livro', 4, 64.9, 'credito'],
-        [29, 'Almoço no restaurante', 2, 41.0, 'credito'],
-        [32, 'Mercado da semana', 2, 221.4, 'debito'],
-        [35, 'Combustível', 3, 170.0, 'credito'],
-        [38, 'Roupa', 7, 139.9, 'credito'],
-        [41, 'Cinema', 4, 52.0, 'pix'],
-        [44, 'Farmácia', 5, 63.2, 'debito'],
-        [48, 'Mercado da semana', 2, 198.8, 'debito'],
-        [52, 'Aplicativo de transporte', 3, 31.5, 'credito'],
-        [56, 'Pizza com amigos', 2, 85.0, 'pix'],
-        [60, 'Combustível', 3, 165.0, 'credito'],
-        [66, 'Mercado da semana', 2, 207.0, 'debito'],
-        [72, 'Show', 4, 140.0, 'pix'],
-        [80, 'Presente', 7, 95.0, 'credito'],
+    // Gastos avulsos: gerados de forma determinística (sempre os mesmos valores) pelos últimos ~110 dias,
+    // com descrições que se repetem para alimentar o gráfico "Contas que mais se repetem".
+    // [descrição, categoria, valor mínimo, valor máximo, peso (frequência relativa)]
+    const modelos = [
+        ['Mercado da semana', 2, 120, 230, 4],
+        ['Padaria', 2, 8, 32, 7],
+        ['Lanche', 2, 15, 45, 5],
+        ['Pizza com amigos', 2, 60, 110, 2],
+        ['Pix Pizzaria', 2, 50, 90, 2],
+        ['Almoço no restaurante', 2, 30, 62, 4],
+        ['Café com leite', 2, 8, 20, 6],
+        ['Sorvete', 2, 10, 25, 1],
+        ['Combustível', 3, 150, 200, 2],
+        ['Aplicativo de transporte', 3, 15, 42, 5],
+        ['Estacionamento', 3, 10, 30, 3],
+        ['Farmácia', 5, 30, 95, 3],
+        ['Cinema', 4, 40, 70, 3],
+        ['Show', 4, 120, 200, 1],
+        ['Livro', 4, 40, 90, 1],
+        ['Presente', 7, 60, 150, 1],
+        ['Roupa', 7, 90, 200, 1],
+        ['Lavanderia', 7, 25, 60, 1],
+        ['Barbearia', 7, 35, 60, 1],
     ];
-    const avulsos = avulsosBase.map(([atras, descricao, categoria_id, digitado, forma_pagamento]) => {
-        const juros = forma_pagamento === 'pix' ? config.juros_pix : 0;
-        return {
-            id: id++,
-            descricao,
-            categoria_id,
-            data: somarDias(hojeISO, -atras),
-            forma_pagamento,
-            valor_original: digitado,
-            juros_percentual: juros,
-            valor: Math.round(digitado * (1 + juros / 100) * 100) / 100,
-            observacao: '',
-        };
-    });
+    const sorteio = [];
+    modelos.forEach((m, i) => { for (let k = 0; k < m[4]; k++) sorteio.push(i); });
+    const formas = ['credito', 'debito', 'pix', 'dinheiro', 'credito', 'debito'];
+    let semente = 20261123; // gerador simples e determinístico
+    const aleatorio = () => {
+        semente = (semente * 1664525 + 1013904223) % 4294967296;
+        return semente / 4294967296;
+    };
+    const avulsos = [];
+    for (let atras = 110; atras >= 0; atras--) {
+        const r = aleatorio();
+        const quantos = r < 0.15 ? 0 : r < 0.55 ? 1 : r < 0.9 ? 2 : 3;
+        for (let q = 0; q < quantos; q++) {
+            const [descricao, categoria_id, min, max] = modelos[sorteio[Math.floor(aleatorio() * sorteio.length)]];
+            avulsos.push({
+                id: id++,
+                descricao,
+                categoria_id,
+                data: somarDias(hojeISO, -atras),
+                forma_pagamento: formas[Math.floor(aleatorio() * formas.length)],
+                valor: Math.round((min + (max - min) * aleatorio()) * 100) / 100,
+                observacao: '',
+            });
+        }
+    }
 
     return { config, categorias: categoriasPadrao(), parcelas, fixos, avulsos, prox_id: id };
 }
